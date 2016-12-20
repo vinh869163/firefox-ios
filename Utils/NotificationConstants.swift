@@ -20,5 +20,9 @@ public let NotificationOnPageMetadataFetched = "OnPageMetadataFetched"
 // Fired when the login synchronizer has finished applying remote changes
 public let NotificationDataRemoteLoginChangesWereApplied = "NotificationDataRemoteLoginChangesWereApplied"
 
+public let NotificationSyncDidApplyRecords = "NotificationSyncDidApplyRecords"
+
+public let NotificationSyncDidUploadRecords = "NotificationSyncDidUploadRecords"
+
 // MARK: Notification UserInfo Keys
 public let NotificationUserInfoKeyHasSyncableAccount = "NotificationUserInfoKeyHasSyncableAccount"

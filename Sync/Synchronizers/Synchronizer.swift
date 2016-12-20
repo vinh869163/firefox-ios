@@ -92,6 +92,18 @@ public enum SyncStatus {
     }
 }
 
+public class SyncUploadStats {
+    var sent: Int = 0
+    var sentFailed: Int = 0
+}
+
+public class SyncDownloadStats {
+    var applied: Int = 0
+    var succeeded: Int = 0
+    var failed: Int = 0
+    var newFailed: Int = 0
+    var reconciled: Int = 0
+}
 
 public typealias DeferredTimestamp = Deferred<Maybe<Timestamp>>
 public typealias SyncResult = Deferred<Maybe<SyncStatus>>
