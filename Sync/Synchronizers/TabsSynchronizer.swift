@@ -81,7 +81,7 @@ public class TabsSynchronizer: TimestampedSingleCollectionSynchronizer, Synchron
                     uploadStats.sentFailed += 1
                 }
                 return succeed()
-            } >>== effect({ self.statsDelegate?.syncEngine("tabs", didGenerateUploadStats: uploadStats) })
+            } >>== effect({ self.statsDelegate?.engineDidGenerateUploadStats(uploadStats) })
         }
     }
 
@@ -137,7 +137,7 @@ public class TabsSynchronizer: TimestampedSingleCollectionSynchronizer, Synchron
                             self.lastFetched = responseTimestamp!
                             return succeed()
                         }
-                } >>== effect({ self.statsDelegate?.syncEngine("tabs", didGenerateApplyStats: downloadStats) })
+                } >>== effect({ self.statsDelegate?.engineDidGenerateApplyStats(downloadStats) })
             }
 
             // If this is a fresh start, do a wipe.

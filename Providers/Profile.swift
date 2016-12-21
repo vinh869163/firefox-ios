@@ -1139,10 +1139,10 @@ public class BrowserProfile: Profile {
         }
 
         private func statsWrapEngineSync(engine: String, syncThunk: (SyncStatsDelegate) -> SyncResult) -> SyncResult {
-            let statsDelegate = SyncEngineStatsObserver()
-            statsDelegate.syncEngineWillBeginReport(engine)
+            let statsDelegate = SyncEngineStatsObserver(engine: engine)
+            statsDelegate.engineWillBeginReport()
             return syncThunk(statsDelegate) >>== effect({ status in
-                guard let stats = statsDelegate.syncEngineDidEndReport(engine, status: status) else {
+                guard let stats = statsDelegate.engineDidEndReport(status) else {
                     return
                 }
                 self.syncStatsReport?.addStats(stats, forEngine: engine)

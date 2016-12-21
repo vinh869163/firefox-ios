@@ -7,17 +7,33 @@ import Shared
 import Account
 
 // MARK: Stats/Telemetry structures
-public struct SyncUploadStats {
-    var sent: Int = 0
-    var sentFailed: Int = 0
+public protocol SyncStats {
+    func hasData() -> Bool
 }
 
-public struct SyncDownloadStats {
+public struct SyncUploadStats: SyncStats {
+    var sent: Int = 0
+    var sentFailed: Int = 0
+
+    public func hasData() -> Bool {
+        return sent > 0 || sentFailed > 0
+    }
+}
+
+public struct SyncDownloadStats: SyncStats {
     var applied: Int = 0
     var succeeded: Int = 0
     var failed: Int = 0
     var newFailed: Int = 0
     var reconciled: Int = 0
+
+    public func hasData() -> Bool {
+        return applied > 0 ||
+               succeeded > 0 ||
+               failed > 0 ||
+               newFailed > 0 ||
+               reconciled > 0
+    }
 }
 
 // TODO: Implement various bookmark validation issues we can run into
@@ -64,33 +80,37 @@ public class SyncStatsReport {
 }
 
 public protocol SyncStatsDelegate: class {
-    func syncEngineWillBeginReport(engine: String)
-    func syncEngine(engine: String, didGenerateUploadStats: SyncUploadStats)
-    func syncEngine(engine: String, didGenerateApplyStats: SyncDownloadStats)
-    func syncEngineDidEndReport(engine: String, status: SyncStatus) -> SyncEngineStats?
+    func engineWillBeginReport()
+    func engineDidGenerateUploadStats(stats: SyncUploadStats)
+    func engineDidGenerateApplyStats(stats: SyncDownloadStats)
+    func engineDidEndReport(status: SyncStatus) -> SyncEngineStats?
 }
 
 // Delegate object that is passed along to each synchronizer to pull out upload/downloading stats
 public class SyncEngineStatsObserver: SyncStatsDelegate {
+    let engine: String
+
     var engineStats: SyncEngineStats?
     var startSyncTime: Timestamp?
 
-    public init() {}
+    public init(engine: String) {
+        self.engine = engine
+    }
 
-    public func syncEngineWillBeginReport(engine: String) {
-        engineStats = SyncEngineStats(name: engine)
+    public func engineWillBeginReport() {
+        engineStats = SyncEngineStats(name: self.engine)
         startSyncTime = NSDate.now()
     }
     
-    public func syncEngine(engine: String, didGenerateUploadStats stats: SyncUploadStats) {
-        engineStats?.uploadStats = stats
+    public func engineDidGenerateUploadStats(stats: SyncUploadStats) {
+        engineStats?.uploadStats = stats.hasData() ? stats : nil
     }
 
-    public func syncEngine(engine: String, didGenerateApplyStats stats: SyncDownloadStats) {
-        engineStats?.downloadStats = stats
+    public func engineDidGenerateApplyStats(stats: SyncDownloadStats) {
+        engineStats?.downloadStats = stats.hasData() ? stats : nil
     }
 
-    public func syncEngineDidEndReport(engine: String, status: SyncStatus) -> SyncEngineStats? {
+    public func engineDidEndReport(status: SyncStatus) -> SyncEngineStats? {
         defer { engineStats = nil }
 
         engineStats?.status = status

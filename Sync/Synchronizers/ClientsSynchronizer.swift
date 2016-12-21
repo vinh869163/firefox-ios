@@ -277,7 +277,7 @@ public class ClientsSynchronizer: TimestampedSingleCollectionSynchronizer, Synch
                 } else {
                     uploadStats.sentFailed += 1
                 }
-                self.statsDelegate?.syncEngine("clients", didGenerateUploadStats: uploadStats)
+                self.statsDelegate?.engineDidGenerateUploadStats(uploadStats)
                 return succeed()
         }
     }
@@ -323,7 +323,7 @@ public class ClientsSynchronizer: TimestampedSingleCollectionSynchronizer, Synch
             >>== { succeeded in
                 downloadStats.succeeded += succeeded
                 downloadStats.failed += (toInsert.count - succeeded)
-                self.statsDelegate?.syncEngine("clients", didGenerateApplyStats: downloadStats)
+                self.statsDelegate?.engineDidGenerateApplyStats(downloadStats)
                 return succeed()
             }
             >>== { self.processCommandsFromRecord(ours, withServer: storageClient) }
