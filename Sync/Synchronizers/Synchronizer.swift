@@ -19,6 +19,13 @@ public protocol SyncDelegate {
     // TODO: storage.
 }
 
+public protocol SyncStatsDelegate {
+    func syncEngineWillBeginReport(engine: String)
+    func syncEngine(engine: String, didGenerateUploadStats: SyncUploadStats)
+    func syncEngine(engine: String, didGenerateApplyStats: SyncDownloadStats)
+    func syncEngineDidEndReport(engine: String, status: SyncStatus) -> SyncEngineStats?
+}
+
 /**
  * We sometimes want to make a synchronizer start from scratch: to throw away any
  * metadata and reset storage to match, allowing us to respond to significant server
@@ -57,7 +64,7 @@ public protocol ResettableSynchronizer {
  * pickle instructions for eventual delivery next time one is made and synchronized…
  */
 public protocol Synchronizer {
-    init(scratchpad: Scratchpad, delegate: SyncDelegate, basePrefs: Prefs)
+    init(scratchpad: Scratchpad, delegate: SyncDelegate, statsDelegate: SyncStatsDelegate, basePrefs: Prefs)
 
     /**
      * Return a reason if the current state of this synchronizer -- particularly prefs and scratchpad --
@@ -92,17 +99,35 @@ public enum SyncStatus {
     }
 }
 
-public class SyncUploadStats {
+// MARK: Stats/Telemetry structures
+public struct SyncUploadStats {
     var sent: Int = 0
     var sentFailed: Int = 0
 }
 
-public class SyncDownloadStats {
+public struct SyncDownloadStats {
     var applied: Int = 0
     var succeeded: Int = 0
     var failed: Int = 0
     var newFailed: Int = 0
     var reconciled: Int = 0
+}
+
+// TODO: Implement various bookmark validation issues we can run into
+public struct ValidationStats {}
+
+public struct SyncEngineStats {
+    public let name: String
+    public var uploadStats: SyncUploadStats?
+    public var downloadStats: SyncDownloadStats?
+    public var took: UInt64 = 0
+    public var status: SyncStatus = .Completed
+    public var failureReason: AnyObject?
+    public var validationStats: ValidationStats?
+
+    public init(name: String) {
+        self.name = name
+    }
 }
 
 public typealias DeferredTimestamp = Deferred<Maybe<Timestamp>>
@@ -153,6 +178,7 @@ public class BaseCollectionSynchronizer {
 
     let scratchpad: Scratchpad
     let delegate: SyncDelegate
+    let statsDelegate: SyncStatsDelegate
     let prefs: Prefs
 
     static func prefsForCollection(collection: String, withBasePrefs basePrefs: Prefs) -> Prefs {
@@ -160,9 +186,10 @@ public class BaseCollectionSynchronizer {
         return basePrefs.branch(branchName)
     }
 
-    init(scratchpad: Scratchpad, delegate: SyncDelegate, basePrefs: Prefs, collection: String) {
+    init(scratchpad: Scratchpad, delegate: SyncDelegate, statsDelegate: SyncStatsDelegate, basePrefs: Prefs, collection: String) {
         self.scratchpad = scratchpad
         self.delegate = delegate
+        self.statsDelegate = statsDelegate
         self.collection = collection
         self.prefs = BaseCollectionSynchronizer.prefsForCollection(collection, withBasePrefs: basePrefs)
 
