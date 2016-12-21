@@ -63,6 +63,13 @@ public class SyncStatsReport {
     }
 }
 
+public protocol SyncStatsDelegate: class {
+    func syncEngineWillBeginReport(engine: String)
+    func syncEngine(engine: String, didGenerateUploadStats: SyncUploadStats)
+    func syncEngine(engine: String, didGenerateApplyStats: SyncDownloadStats)
+    func syncEngineDidEndReport(engine: String, status: SyncStatus) -> SyncEngineStats?
+}
+
 // Delegate object that is passed along to each synchronizer to pull out upload/downloading stats
 public class SyncEngineStatsObserver: SyncStatsDelegate {
     var engineStats: SyncEngineStats?

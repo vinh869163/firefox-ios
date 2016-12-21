@@ -19,13 +19,6 @@ public protocol SyncDelegate {
     // TODO: storage.
 }
 
-public protocol SyncStatsDelegate {
-    func syncEngineWillBeginReport(engine: String)
-    func syncEngine(engine: String, didGenerateUploadStats: SyncUploadStats)
-    func syncEngine(engine: String, didGenerateApplyStats: SyncDownloadStats)
-    func syncEngineDidEndReport(engine: String, status: SyncStatus) -> SyncEngineStats?
-}
-
 /**
  * We sometimes want to make a synchronizer start from scratch: to throw away any
  * metadata and reset storage to match, allowing us to respond to significant server
@@ -147,15 +140,16 @@ public class BaseCollectionSynchronizer {
 
     let scratchpad: Scratchpad
     let delegate: SyncDelegate
-    let statsDelegate: SyncStatsDelegate
     let prefs: Prefs
+
+    weak var statsDelegate: SyncStatsDelegate?
 
     static func prefsForCollection(collection: String, withBasePrefs basePrefs: Prefs) -> Prefs {
         let branchName = "synchronizer." + collection + "."
         return basePrefs.branch(branchName)
     }
 
-    init(scratchpad: Scratchpad, delegate: SyncDelegate, statsDelegate: SyncStatsDelegate, basePrefs: Prefs, collection: String) {
+    init(scratchpad: Scratchpad, delegate: SyncDelegate, statsDelegate: SyncStatsDelegate?, basePrefs: Prefs, collection: String) {
         self.scratchpad = scratchpad
         self.delegate = delegate
         self.statsDelegate = statsDelegate

@@ -132,7 +132,7 @@ public class HistorySynchronizer: IndependentRecordSynchronizer, Synchronizer {
         }
 
         return self.applyIncomingRecords(records, apply: applyRecord)
-            >>> effect({ self.statsDelegate.syncEngine("history", didGenerateApplyStats: stats) })
+            >>> effect({ self.statsDelegate?.syncEngine("history", didGenerateApplyStats: stats) })
     }
 
     private func uploadModifiedPlaces(places: [(Place, [Visit])], lastTimestamp: Timestamp, fromStorage storage: SyncableHistory, withServer storageClient: Sync15CollectionClient<HistoryPayload>, inout stats: SyncUploadStats) -> DeferredTimestamp {
@@ -205,7 +205,7 @@ public class HistorySynchronizer: IndependentRecordSynchronizer, Synchronizer {
           >>== uploadModified
            >>> effect({ log.debug("Done syncing. Work was done? \(workWasDone)") })
            >>> { workWasDone ? storage.doneUpdatingMetadataAfterUpload() : succeed() }    // A closure so we eval workWasDone after it's set!
-           >>> effect({ self.statsDelegate.syncEngine("history", didGenerateUploadStats: stats) })
+           >>> effect({ self.statsDelegate?.syncEngine("history", didGenerateUploadStats: stats) })
            >>> effect({ log.debug("Done.") })
     }
 
