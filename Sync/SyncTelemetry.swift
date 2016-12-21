@@ -59,7 +59,7 @@ public class SyncStatsReport {
     }
 
     public func finishReport() {
-        took = when - NSDate.now()
+        took = NSDate.now() - when
     }
 }
 
