@@ -99,37 +99,6 @@ public enum SyncStatus {
     }
 }
 
-// MARK: Stats/Telemetry structures
-public struct SyncUploadStats {
-    var sent: Int = 0
-    var sentFailed: Int = 0
-}
-
-public struct SyncDownloadStats {
-    var applied: Int = 0
-    var succeeded: Int = 0
-    var failed: Int = 0
-    var newFailed: Int = 0
-    var reconciled: Int = 0
-}
-
-// TODO: Implement various bookmark validation issues we can run into
-public struct ValidationStats {}
-
-public struct SyncEngineStats {
-    public let name: String
-    public var uploadStats: SyncUploadStats?
-    public var downloadStats: SyncDownloadStats?
-    public var took: UInt64 = 0
-    public var status: SyncStatus = .Completed
-    public var failureReason: AnyObject?
-    public var validationStats: ValidationStats?
-
-    public init(name: String) {
-        self.name = name
-    }
-}
-
 public typealias DeferredTimestamp = Deferred<Maybe<Timestamp>>
 public typealias SyncResult = Deferred<Maybe<SyncStatus>>
 
