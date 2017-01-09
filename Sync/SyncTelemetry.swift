@@ -80,10 +80,10 @@ public class SyncStatsReport {
 }
 
 public protocol SyncStatsDelegate: class {
-    func engineWillBeginReport()
+    func engineWillBeginCollectingStats()
     func engineDidGenerateUploadStats(stats: SyncUploadStats)
     func engineDidGenerateApplyStats(stats: SyncDownloadStats)
-    func engineDidEndReport(status: SyncStatus) -> SyncEngineStats?
+    func engineDidFinishCollectingStats(status: SyncStatus) -> SyncEngineStats?
 }
 
 // Delegate object that is passed along to each synchronizer to pull out upload/downloading stats
@@ -97,7 +97,7 @@ public class SyncEngineStatsObserver: SyncStatsDelegate {
         self.engine = engine
     }
 
-    public func engineWillBeginReport() {
+    public func engineWillBeginCollectingStats() {
         engineStats = SyncEngineStats(name: self.engine)
         startSyncTime = NSDate.now()
     }
@@ -110,7 +110,7 @@ public class SyncEngineStatsObserver: SyncStatsDelegate {
         engineStats?.downloadStats = stats.hasData() ? stats : nil
     }
 
-    public func engineDidEndReport(status: SyncStatus) -> SyncEngineStats? {
+    public func engineDidFinishCollectingStats(status: SyncStatus) -> SyncEngineStats? {
         defer { engineStats = nil }
 
         engineStats?.status = status
