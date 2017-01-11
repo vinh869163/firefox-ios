@@ -68,13 +68,13 @@ public func GREYAssertNotEqual(@autoclosure left: () -> AnyObject?,
         " term")
 }
 
-public func GREYAssertEqualObjects<T : Equatable>(@autoclosure left: () -> T?,
+public func GREYAssertEqualObjects<T: Equatable>(@autoclosure left: () -> T?,
                                    @autoclosure _ right: () -> T?, reason: String) {
     GREYAssert(left() == right(), reason, details: "Expected object of the left term to be equal" +
         " to the object of the right term")
 }
 
-public func GREYAssertNotEqualObjects<T : Equatable>(@autoclosure left: () -> T?,
+public func GREYAssertNotEqualObjects<T: Equatable>(@autoclosure left: () -> T?,
                                       @autoclosure _ right: () -> T?, reason: String) {
     GREYAssert(left() != right(), reason, details: "Expected object of the left term to not be" +
         " equal to the object of the right term")
