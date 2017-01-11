@@ -12,6 +12,7 @@ import XCGLogger
 private let log = Logger.browserLogger
 private let DefaultSuggestedSitesKey = "topSites.deletedSuggestedSites"
 
+
 // MARK: -  Lifecycle
 struct ASPanelUX {
     static let backgroundColor = UIColor(white: 1.0, alpha: 0.5)
@@ -32,10 +33,15 @@ struct ASPanelUX {
 class ActivityStreamPanel: UITableViewController, HomePanel {
     weak var homePanelDelegate: HomePanelDelegate? = nil
     private let profile: Profile
-    private var onyxSession: OnyxSession?
     private let topSitesManager = ASHorizontalScrollCellManager()
     private var isInitialLoad = true //Prevents intro views from flickering while content is loading
     private let events = [NotificationFirefoxAccountChanged, NotificationProfileDidFinishSyncing, NotificationPrivateDataClearedHistory, NotificationDynamicFontChanged]
+
+    private let eventsTracker = PingCentre.clientForTopic(.ActivityStreamEvents)
+    private let sessionsTracker = PingCentre.clientForTopic(.ActivityStreamSessions)
+
+    private typealias SessionTimestamp = (start: Timestamp?, stop: Timestamp?)
+    private var sessionStart: Timestamp?
 
     lazy var longPressRecognizer: UILongPressGestureRecognizer = {
         return UILongPressGestureRecognizer(target: self, action: #selector(ActivityStreamPanel.longPress(_:)))
@@ -79,7 +85,7 @@ class ActivityStreamPanel: UITableViewController, HomePanel {
 
     override func viewWillAppear(animated: Bool) {
         super.viewWillAppear(animated)
-        self.onyxSession = OnyxTelemetry.sharedClient.beginSession()
+        sessionStart = NSDate.now()
 
         all([invalidateTopSites(), invalidateHighlights()]).uponQueue(dispatch_get_main_queue()) { _ in
             self.isInitialLoad = false
@@ -89,11 +95,8 @@ class ActivityStreamPanel: UITableViewController, HomePanel {
 
     override func viewDidDisappear(animated: Bool) {
         super.viewDidDisappear(animated)
-
-        if let session = onyxSession {
-            session.ping = ASOnyxPing.buildSessionPing(nil, loadReason: .newTab, unloadReason: .navigation, loadLatency: nil, page: .newTab)
-            OnyxTelemetry.sharedClient.endSession(session, sendToEndpoint: .activityStream)
-        }
+        reportSessionStop(NSDate.now() - (sessionStart ?? 0))
+        sessionStart = nil
     }
 
     override func traitCollectionDidChange(previousTraitCollection: UITraitCollection?) {
@@ -218,15 +221,17 @@ extension ActivityStreamPanel {
     override func tableView(tableView: UITableView, didSelectRowAtIndexPath indexPath: NSIndexPath) {
         switch Section(indexPath.section) {
         case .Highlights:
-            let event = ASInfo(actionPosition: indexPath.item, source: .highlights)
-            ASOnyxPing.reportTapEvent(event)
+            reportEvent(.Click, source: .Highlights, position: indexPath.item)
+
             let site = self.highlights[indexPath.row]
             showSiteWithURLHandler(NSURL(string:site.url)!)
         case .TopSites, .HighlightIntro:
             return
-        } 
+        }
     }
 }
+
+
 
 // MARK: - Tableview Data Source
 extension ActivityStreamPanel {
@@ -328,8 +333,7 @@ extension ActivityStreamPanel {
                 self.topSitesManager.currentTraits = self.view.traitCollection
                 self.topSitesManager.content = newSites.count > ASPanelUX.topSitesCacheSize ? Array(newSites[0..<ASPanelUX.topSitesCacheSize]) : newSites
                 self.topSitesManager.urlPressedHandler = { [unowned self] url, indexPath in
-                    let event = ASInfo(actionPosition: indexPath.item, source: .topSites)
-                    ASOnyxPing.reportTapEvent(event)
+                    self.reportEvent(.Click, source: .TopSites, position: indexPath.item)
                     self.showSiteWithURLHandler(url)
                 }
                 
@@ -402,8 +406,7 @@ extension ActivityStreamPanel {
         let siteBGColor = topSiteItemCell.contentView.backgroundColor
 
         let site = self.topSitesManager.content[indexPath.item]
-        let eventSource = ASInfo(actionPosition: indexPath.item, source: .topSites)
-        presentContextMenu(site, eventInfo: eventSource, siteImage: siteImage, siteBGColor: siteBGColor)
+        presentContextMenu(site, atIndex: indexPath.item, forSection: .TopSites, siteImage: siteImage, siteBGColor: siteBGColor)
     }
 
     private func contextMenuForHighlightCellWithIndexPath(indexPath: NSIndexPath) {
@@ -412,14 +415,23 @@ extension ActivityStreamPanel {
         let siteBGColor = highlightCell.siteImageView.backgroundColor
 
         let site = highlights[indexPath.row]
-        let event = ASInfo(actionPosition: indexPath.row, source: .highlights)
-        presentContextMenu(site, eventInfo: event, siteImage: siteImage, siteBGColor: siteBGColor)
+        presentContextMenu(site, atIndex: indexPath.row, forSection: .Highlights, siteImage: siteImage, siteBGColor: siteBGColor)
     }
 
 
-    private func presentContextMenu(site: Site, eventInfo: ASInfo, siteImage: UIImage?, siteBGColor: UIColor?) {
+    private func presentContextMenu(site: Site, atIndex index: Int, forSection section: Section, siteImage: UIImage?, siteBGColor: UIColor?) {
         guard let siteURL = NSURL(string: site.url) else {
             return
+        }
+
+        let pingSource: ASPingSource
+        switch section {
+        case .TopSites:
+            pingSource = .TopSites
+        case .Highlights:
+            pingSource = .Highlights
+        case .HighlightIntro:
+            pingSource = .HighlightsIntro
         }
 
         let openInNewTabAction = ActionOverlayTableViewAction(title: Strings.OpenInNewTabContextMenuTitle, iconString: "action_new_tab") { action in
@@ -443,38 +455,83 @@ extension ActivityStreamPanel {
         })
 
         let deleteFromHistoryAction = ActionOverlayTableViewAction(title: Strings.DeleteFromHistoryContextMenuTitle, iconString: "action_delete", handler: { action in
-            ASOnyxPing.reportDeleteItemEvent(eventInfo)
+            self.reportEvent(.Delete, source: pingSource, position: index)
             self.profile.history.removeHistoryForURL(site.url)
         })
 
         let shareAction = ActionOverlayTableViewAction(title: Strings.ShareContextMenuTitle, iconString: "action_share", handler: { action in
             let helper = ShareExtensionHelper(url: siteURL, tab: nil, activities: [])
             let controller = helper.createActivityViewController { completed, activityType in
-                ASOnyxPing.reportShareEvent(eventInfo, shareProvider: activityType)
+                self.reportEvent(.Share, source: pingSource, position: index, shareProvider: activityType)
             }
             self.presentViewController(controller, animated: true, completion: nil)
         })
 
         let removeTopSiteAction = ActionOverlayTableViewAction(title: Strings.RemoveFromASContextMenuTitle, iconString: "action_close", handler: { action in
-            ASOnyxPing.reportDeleteItemEvent(eventInfo)
+            self.reportEvent(.Dismiss, source: pingSource, position: index)
             self.hideURLFromTopSites(site.tileURL)
         })
         
         let dismissHighlightAction = ActionOverlayTableViewAction(title: Strings.RemoveFromASContextMenuTitle, iconString: "action_close", handler: { action in
-            ASOnyxPing.reportDeleteItemEvent(eventInfo)
+            self.reportEvent(.Dismiss, source: pingSource, position: index)
             self.hideFromHighlights(site)
         })
 
         var actions = [openInNewTabAction, openInNewPrivateTabAction, bookmarkAction, shareAction]
-        switch eventInfo.source {
-            case .highlights: actions.appendContentsOf([dismissHighlightAction, deleteFromHistoryAction])
-            case .topSites: actions.append(removeTopSiteAction)
-            default: break
+        switch section {
+            case .Highlights: actions.appendContentsOf([dismissHighlightAction, deleteFromHistoryAction])
+            case .TopSites: actions.append(removeTopSiteAction)
+            case .HighlightIntro: break
         }
+
         let contextMenu = ActionOverlayTableViewController(site: site, actions: actions, siteImage: siteImage, siteBGColor: siteBGColor)
         contextMenu.modalPresentationStyle = .OverFullScreen
         contextMenu.modalTransitionStyle = .CrossDissolve
         self.presentViewController(contextMenu, animated: true, completion: nil)
+    }
+}
+
+// MARK: Telemetry
+extension ActivityStreamPanel {
+
+    enum ASPingEvent: String {
+        case Click = "CLICK"
+        case Delete = "DELETE"
+        case Dismiss = "DISMISS"
+        case Share = "SHARE"
+    }
+
+    enum ASPingSource: String {
+        case Highlights = "HIGHLIGHTS"
+        case TopSites = "TOP_SITES"
+        case HighlightsIntro = "HIGHLIGHTS_INTRO"
+    }
+
+    private func reportEvent(event: ASPingEvent, source: ASPingSource, position: Int, shareProvider: String? = nil) {
+        var eventPing: [String: AnyObject] = [
+            "event": event.rawValue,
+            "page": "NEW_TAB",
+            "source": source.rawValue,
+            "action_position": position,
+            "app_version": AppInfo.majorAppVersion,
+            "build": AppInfo.buildNumber,
+            "locale": NSLocale.currentLocale().localeIdentifier
+        ]
+
+        if let provider = shareProvider {
+            eventPing["share_provider"] = provider
+        }
+
+        eventsTracker.sendPing(eventPing)
+    }
+
+    private func reportSessionStop(duration: UInt64) {
+        sessionsTracker.sendPing([
+            "session_duration": NSNumber(unsignedLongLong: duration),
+            "app_version": AppInfo.appVersion,
+            "build": AppInfo.buildNumber,
+            "locale": NSLocale.currentLocale().localeIdentifier
+        ])
     }
 }
 
