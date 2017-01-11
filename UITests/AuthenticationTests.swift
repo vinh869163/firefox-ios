@@ -31,6 +31,8 @@ class AuthenticationTests: KIFTestCase {
         enterCredentials(usernameValue: "Username", passwordValue: "Password", username: "foo", password: "bar")
         enterCredentials(usernameValue: "foo", passwordValue: "•••", username: "foo2", password: "bar2")
         enterCredentials(usernameValue: "foo2", passwordValue: "••••", username: "foo3", password: "bar3")
+        
+        // Use KIFTest framework for checking elements within webView
         tester().waitForWebViewElementWithAccessibilityLabel("auth fail")
 
         // Enter valid credentials and ensure the page loads.
